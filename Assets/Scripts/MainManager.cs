@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
+
 
 public class MainManager : MonoBehaviour
 {
@@ -11,14 +13,15 @@ public class MainManager : MonoBehaviour
     public Rigidbody Ball;
 
     public Text ScoreText;
+    public Text bestScoreText;
     public GameObject GameOverText;
     
     private bool m_Started = false;
     private int m_Points;
-    
+
     private bool m_GameOver = false;
 
-    
+
     // Start is called before the first frame update
     void Start()
     {
@@ -36,6 +39,11 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+        LoadNameAndScore();
+        if (UIManager.Instance != null)
+            bestScoreText.text = $"Best Score : {UIManager.Instance.playerName} : {UIManager.Instance.bestScore}";
+        else
+            bestScoreText.text = $"Best Score : Name : 0";
     }
 
     private void Update()
@@ -58,7 +66,17 @@ public class MainManager : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                if (UIManager.Instance.bestScoreNow > UIManager.Instance.bestScore)
+                    UIManager.Instance.bestScore = UIManager.Instance.bestScoreNow;
+                UIManager.Instance.bestScoreNow = 0;
             }
+        }
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            SceneManager.LoadScene(0);
+            if (UIManager.Instance.bestScoreNow > UIManager.Instance.bestScore)
+                UIManager.Instance.bestScore = UIManager.Instance.bestScoreNow;
+            UIManager.Instance.bestScoreNow = 0;
         }
     }
 
@@ -66,11 +84,58 @@ public class MainManager : MonoBehaviour
     {
         m_Points += point;
         ScoreText.text = $"Score : {m_Points}";
+        BestScoreCalculation(m_Points);
+    }
+    void BestScoreCalculation(int Point)
+    {
+        if (Point > UIManager.Instance.bestScore)
+        {
+            UIManager.Instance.bestScore = Point;
+            UIManager.Instance.playerName = UIManager.Instance.playerNameNow;
+            BestScoreDisplay(UIManager.Instance.bestScore);
+            SaveNameAndScore();
+        }
+    }
+    void BestScoreDisplay(int bestPoint)
+    {
+        if(UIManager.Instance!=null)
+            bestScoreText.text = $"Best Score : {UIManager.Instance.playerNameNow} : {bestPoint}";
+        else
+            bestScoreText.text = $"Best Score : Name : {bestPoint}";
     }
 
     public void GameOver()
     {
         m_GameOver = true;
         GameOverText.SetActive(true);
+    }
+
+    [System.Serializable]
+    class SaveData
+    {
+        public string playerName;
+        public int bestScore;
+    }
+    public void SaveNameAndScore()
+    {
+        SaveData data = new SaveData();
+        data.playerName = UIManager.Instance.playerName;
+        data.bestScore = UIManager.Instance.bestScore;
+
+        string json = JsonUtility.ToJson(data);
+
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
+    }
+    public void LoadNameAndScore()
+    {
+        string path = Application.persistentDataPath + "/savefile.json";
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+            UIManager.Instance.playerName = data.playerName;
+            UIManager.Instance.bestScore = data.bestScore;
+        }
     }
 }
